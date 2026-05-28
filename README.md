@@ -1,100 +1,160 @@
 # PersonaVault AI
 
-A personal identity, document vault, proof-pack sharing, and AI document authenticity checker for the AI era.
+Personal identity, document vault, proof-pack sharing, and AI authenticity checker MVP.
 
-PersonaVault AI helps users create a verified personal profile, store important documents, generate privacy-controlled proof packs, analyze suspicious offers or documents with AI, and track access through an audit timeline.
+PersonaVault AI is a full-stack product prototype for the AI era: a user can create a verified personal profile, store important documents in a private vault, prepare privacy-controlled proof packs, and eventually analyze suspicious offers or documents with a server-side AI checker.
 
-## Status
+## Current Status
 
-Phase 4 implementation is present; local Supabase verification is pending. The app currently has Supabase email/password auth, protected `/app` routes, a verified profile editor, public profile pages, document vault upload/delete code with SHA-256 hashing, and audit logging for profile and vault actions.
+Phase 4 implementation is present; local Supabase Storage verification is pending. The current codebase includes Supabase email/password auth, protected `/app` routes, a verified profile editor, public profile pages, document vault upload/delete implementation with SHA-256 hashing, and audit logging for profile and vault actions.
 
-Proof Pack, Checker, and Audit business modules are intentionally still placeholders.
+Proof Pack, AI Checker, and full Audit Timeline business modules are still upcoming placeholders.
+
+## Problem
+
+Students and early-career candidates often need to prove identity, academic context, portfolio credibility, and document authenticity across many online workflows. The usual pattern is scattered: profile links in one place, PDFs in another, screenshots in chats, and little visibility into what was shared or when.
+
+At the same time, AI-generated scams and suspicious offers make it harder to trust documents, recruiter messages, and employment opportunities without a structured review process.
+
+## Solution
+
+PersonaVault AI organizes a user's profile and documents around controlled proof sharing:
+
+- Keep a verified personal profile in one place.
+- Store important documents in a private vault.
+- Track SHA-256 hashes for uploaded files as tamper-evidence.
+- Prepare proof packs with recipient labels, expiry, and watermarks in a future phase.
+- Route suspicious document or offer text through a server-side AI checker in a future phase.
+- Record important actions in audit logs.
+
+## Key Features
+
+Implemented:
+
+- Landing page and professional app shell.
+- Supabase email/password login and signup.
+- Middleware-protected `/app` routes.
+- Session-aware redirect behavior for `/login` and `/app/*`.
+- Verified profile create/update form with Zod validation.
+- Public profile page at `/u/[id]`.
+- Document vault page at `/app/vault`.
+- Server action for private document upload to Supabase Storage.
+- SHA-256 hash computation for uploaded documents.
+- Document metadata persistence in Supabase Postgres.
+- Document deletion with database row removal and best-effort storage cleanup.
+- Audit log insertion for profile and document create/update/delete actions.
+- SQL schema with RLS policies for profiles, documents, audit logs, and storage objects.
+
+Planned:
+
+- Proof pack generation and public share pages backed by real data.
+- Server-side AI document/offer checker.
+- Full audit timeline UI.
+- More complete verification flows.
 
 ## Tech Stack
 
-- Next.js App Router
-- TypeScript
-- Tailwind CSS
-- shadcn/ui conventions
-- Supabase Auth, Postgres, and Storage
-- Planned server-side AI API route
-- Zod validation
-- Vercel-ready deployment
+- **Framework:** Next.js App Router
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+- **UI conventions:** shadcn/ui-style local primitives
+- **Auth:** Supabase Auth
+- **Database:** Supabase Postgres
+- **Storage:** Supabase Storage
+- **Validation:** Zod
+- **Deployment target:** Vercel-compatible Next.js app
 
-## Planned Routes
+## Architecture Overview
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Landing page |
-| `/login` | Supabase login/signup |
-| `/app` | Protected dashboard |
-| `/app/profile` | Verified profile editor |
-| `/u/[id]` | Public profile |
-| `/app/vault` | Document vault |
-| `/app/proof-packs` | Proof pack list |
-| `/app/proof-packs/new` | Proof pack generator |
-| `/share/[token]` | Public proof-pack share page |
-| `/app/checker` | AI document/offer checker |
-| `/app/audit` | Audit timeline |
-
-## Project Structure
-
-```txt
-src/
-  app/
-    auth/callback/       Supabase email confirmation callback
-    app/                 Protected app shell routes
-    login/               Auth entry route
-    share/[token]/       Public proof-pack route
-    u/[id]/              Public profile route
-    globals.css          Tailwind and design tokens
-    layout.tsx           Root layout
-    page.tsx             Landing page
-  components/
-    auth/                Login/signup form
-    app/                 App shell and dashboard UI
-    layout/              Public layout pieces
-    profile/             Verified profile form
-    vault/               Document vault upload and table UI
-    ui/                  shadcn-style primitives
-docs/
-  supabase-schema.sql    Profiles, documents, audit logs, and storage RLS
-src/lib/
-  auth/                  Auth redirect helpers
-  supabase/              Browser/server Supabase clients
-  validators/            Zod validation helpers
-  vault/                 Document display helpers
-middleware.ts            Supabase session refresh and route protection
+```text
+Browser
+  -> Next.js App Router pages
+  -> Client forms and server actions
+  -> Supabase SSR client
+  -> Supabase Auth / Postgres / Storage
 ```
 
-## Local Development
+- `middleware.ts` refreshes Supabase sessions and protects `/app/*`.
+- `src/app/app/layout.tsx` performs a server-side auth check and renders the app shell.
+- `src/lib/supabase/client.ts` creates the browser Supabase client.
+- `src/lib/supabase/server.ts` creates the cookie-aware server Supabase client.
+- `src/app/app/profile/actions.ts` handles profile persistence and profile audit events.
+- `src/app/app/vault/actions.ts` handles document upload, hashing, metadata, deletion, and vault audit events.
+- `docs/supabase-schema.sql` contains the current database/storage schema and RLS policies.
 
-1. Install dependencies:
+More detail is available in [docs/architecture.md](docs/architecture.md).
+
+## Core User Flows
+
+### Auth
+
+1. User visits `/login`.
+2. User signs up or signs in with email/password.
+3. Supabase session cookies are refreshed by middleware.
+4. Authenticated users access `/app`; unauthenticated users are redirected to `/login`.
+
+### Verified Profile
+
+1. User opens `/app/profile`.
+2. The page loads the user's profile row by authenticated `user_id`.
+3. If no profile exists, the form saves a new row.
+4. On update, the server action updates only the current user's row.
+5. A profile audit event is inserted.
+6. The public page `/u/[id]` displays public profile fields.
+
+### Document Vault
+
+1. User opens `/app/vault`.
+2. User uploads a PDF, PNG, JPG, or JPEG file up to 10 MB.
+3. The server action computes the SHA-256 hash.
+4. The file is uploaded to the private `documents` bucket under `{userId}/{timestamp}-{safeFileName}`.
+5. Metadata is saved to the `documents` table.
+6. The vault table displays metadata only, not public file URLs.
+7. Deleting a document removes the database row and attempts storage cleanup.
+
+## Data Model Overview
+
+Current schema:
+
+- `profiles`: public profile fields, verification flags, `user_id`, timestamps.
+- `documents`: file metadata, storage path, SHA-256 hash, visibility, `user_id`.
+- `audit_logs`: user-scoped action log with entity metadata.
+
+Planned schema:
+
+- `proof_packs`
+- `proof_pack_items`
+- `document_checks`
+
+The schema and RLS policies live in [docs/supabase-schema.sql](docs/supabase-schema.sql).
+
+## Local Setup
+
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-2. Create a local env file:
+Create a local env file:
 
 ```bash
 cp .env.example .env.local
 ```
 
-3. Fill in Supabase values in `.env.local`.
-
-4. Run the app:
+Fill in your Supabase values in `.env.local`, then run the app:
 
 ```bash
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000).
 
-If port `3000` is occupied, run a different port and update `NEXT_PUBLIC_SITE_URL`:
+On Windows PowerShell:
 
-```bash
-npm run dev -- --port 3001
+```powershell
+npm.cmd install
+npm.cmd run dev
 ```
 
 ## Environment Variables
@@ -107,116 +167,64 @@ SUPABASE_STORAGE_BUCKET=documents
 OPENAI_API_KEY=
 ```
 
-Never expose service role keys or AI provider keys through `NEXT_PUBLIC_*` variables. The current MVP uses the Supabase anon key plus Row Level Security for user-scoped database and storage access.
+Do not expose service role keys or AI provider keys through `NEXT_PUBLIC_*` variables. The current MVP uses the Supabase anon key plus Row Level Security for user-scoped database and storage access.
 
-## Supabase Auth Setup
+## Supabase Setup
 
 1. Create a Supabase project.
-2. In Supabase, go to Project Settings -> API and copy:
-   - Project URL into `NEXT_PUBLIC_SUPABASE_URL`
-   - `anon public` key into `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. In Authentication -> Providers, enable Email.
-4. For local development, set `NEXT_PUBLIC_SITE_URL` to your dev origin, for example `http://localhost:3001`.
-5. In Authentication -> URL Configuration, add redirect URLs for your local app:
+2. Enable Email authentication.
+3. Add these redirect URLs in Supabase Auth settings:
 
 ```txt
 http://localhost:3000/auth/callback
 http://localhost:3001/auth/callback
 ```
 
-6. Restart the Next.js dev server after changing `.env.local`.
+4. Run [docs/supabase-schema.sql](docs/supabase-schema.sql) in Supabase SQL Editor.
+5. Confirm the private `documents` bucket exists. The SQL attempts to create/update it safely.
+6. Restart the local dev server after changing `.env.local`.
 
-Auth behavior:
+## Testing / Quality Checks
 
-- Unauthenticated visits to `/app/*` redirect to `/login`.
-- Authenticated visits to `/login` redirect to `/app`.
-- Email confirmation links land on `/auth/callback`, exchange the Supabase code server-side, then redirect into `/app`.
-- Logout clears the Supabase session and returns the user to `/login`.
-
-## Supabase Database Setup
-
-Phase 4 requires the `profiles`, `documents`, and `audit_logs` tables before `/app/profile` and `/app/vault` can save data.
-
-1. Open Supabase.
-2. Go to SQL Editor.
-3. Open [docs/supabase-schema.sql](docs/supabase-schema.sql).
-4. Paste the full SQL into Supabase SQL Editor and run it.
-5. Refresh the local app.
-
-The schema file creates:
-
-- `profiles`
-- `documents`
-- `audit_logs`
-- indexes
-- `updated_at` trigger
-- private `documents` storage bucket setup
-- Row Level Security policies
-
-RLS summary:
-
-- Public users can read profile rows for public profile pages.
-- Authenticated users can insert and update only their own profile.
-- Authenticated users can select, insert, and delete only their own document metadata.
-- Authenticated users can insert only their own audit logs.
-- Authenticated users can read only their own audit logs.
-- Authenticated users can access storage objects only when the first path segment matches their Supabase user id.
-
-## Supabase Storage Setup
-
-The SQL script attempts to create or update a private Supabase Storage bucket named `documents` with a 10 MB file limit and allowed MIME types for PDF, PNG, and JPEG.
-
-If you prefer to create the bucket in the Supabase dashboard:
-
-1. Go to Storage.
-2. Create a bucket named `documents`.
-3. Keep the bucket private.
-4. Set the allowed MIME types to:
-
-```txt
-application/pdf
-image/png
-image/jpeg
+```bash
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-5. Run [docs/supabase-schema.sql](docs/supabase-schema.sql) afterward so the storage RLS policies are created.
+These commands passed during the initial GitHub checkpoint and should be run before future phase commits.
 
-## Planned Database Tables
+## Security and Privacy Notes
 
-- `profiles` implemented in `docs/supabase-schema.sql`
-- `documents` implemented in `docs/supabase-schema.sql`
-- `proof_packs`
-- `proof_pack_items`
-- `document_checks`
-- `audit_logs` implemented in `docs/supabase-schema.sql`
+- Authenticated user IDs are derived from the server Supabase session, not from client input.
+- RLS policies restrict profile edits, document metadata, storage objects, and audit logs to the owning user where applicable.
+- Public profile pages intentionally select only public profile fields.
+- Vault files are stored in a private Supabase Storage bucket.
+- The app does not expose raw public storage URLs by default.
+- SHA-256 hashes help detect file changes, but they are not encryption or access control.
+- Future hardening should include encryption strategy, signed URL review, rate limits, audit retention rules, and a security review before production use.
 
-Remaining table migrations and Row Level Security policies will be added in later phases.
+## Known Limitations
 
-## Security Notes
+- Phase 4 document vault code is implemented, but live Supabase upload/delete verification is still pending.
+- Proof packs are placeholder pages and do not yet persist or share selected documents.
+- The AI checker page is a placeholder and does not yet call an AI provider.
+- The audit timeline page is not yet connected to persisted audit log rows.
+- Email verification and GitHub verification badges are simple flags/placeholders, not full verification workflows.
+- This is an MVP/prototype, not a production identity or compliance system.
 
-- AI provider calls must happen only in server-side routes or server actions.
-- Supabase Auth uses the public anon key on the client and server-side session checks for protected app routes.
-- Profile writes derive `user_id` from the authenticated session instead of trusting client input.
-- Profile create/update actions insert audit log events: `PROFILE_CREATED` and `PROFILE_UPDATED`.
-- Document writes derive `user_id` from the authenticated session instead of trusting client input.
-- Vault uploads are stored under `{userId}/{timestamp}-{safeFileName}` inside the private `documents` bucket.
-- The vault stores file metadata and SHA-256 hashes, but does not expose raw public storage URLs by default.
-- Document upload/delete actions insert audit log events: `DOCUMENT_UPLOADED` and `DOCUMENT_DELETED`.
-- Supabase Row Level Security should restrict each user to their own profile, documents, proof packs, AI checks, and audit logs.
-- Public proof-pack links should validate token existence, expiry, and visibility before rendering any metadata.
-- Hashing document contents with SHA-256 helps detect tampering but is not a replacement for strong access controls.
-- Future hardening should include encryption at rest strategy, signed URL policy review, abuse limits, audit retention rules, and security review before production use.
+## Roadmap
 
-## One-Week MVP Phases
+1. Verify Supabase Storage upload/delete behavior against a live project.
+2. Implement proof pack creation, item selection, recipient labels, expiry, and public share pages.
+3. Implement the server-side AI document/offer checker with strict JSON validation.
+4. Build the audit timeline UI from `audit_logs`.
+5. Add integration tests around auth, profile, vault, and server actions.
+6. Add deployment notes, demo script, and screenshots.
 
-1. Foundation: project setup, design system, route shell, Supabase helpers.
-2. Auth: Supabase login/signup, protected routes, session-aware redirects.
-3. Verified profile: private profile editor, public profile page, profile audit logs.
-4. Vault: private uploads, metadata persistence, SHA-256 hashing, storage rules.
-5. Proof packs: pack creation, item selection, token generation, expiry handling, public share page.
-6. AI checker: strict Zod request/response validation, server-side AI route, risk report persistence.
-7. Audit timeline and polish: action logging across remaining modules, Vercel deployment, demo script.
+## What I Learned
 
-## License
-
-License to be decided before public release.
+- How to structure a serious full-stack MVP around auth, protected routes, server actions, and user-scoped data.
+- Why identity and document-sharing products need privacy boundaries from the first design pass.
+- How Supabase Auth, Postgres RLS, and Storage policies work together in a Next.js App Router app.
+- How to keep planned AI features honest by documenting boundaries before implementation.
